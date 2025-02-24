@@ -12,10 +12,6 @@ The MPC implementation for the Go1 robot from the repository [unitreeMPC_guide](
 - Velocity control proportional to positional error
 - Yaw control to maintain orientation toward the next vertex
 
-## Installation dependencies 
-- Ubuntu 20.04
-- ROS Neotic
-
 ## Build
 Please refer to Unitree official configuration [https://github.com/unitreerobotics/unitree_guide] and to the repository [unitreeMPC_guide](https://github.com/Mr-Y-B-L/unitreeMPC_guide) for detailed instructions on dependencies and configuration.
 
@@ -30,7 +26,7 @@ This project is released under the same license as the original Unitree SDK and 
 - Cinardi Nicoletta
 - Di Mauro Miriam
 - Finocchiaro Carla
-- Panebianco Gaia.
+- Panebianco Gaia
 
 For further information contact the project maintainers.
 
