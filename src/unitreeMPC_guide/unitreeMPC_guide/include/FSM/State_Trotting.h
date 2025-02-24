@@ -88,6 +88,9 @@ private:
     // Calculate average value
     AvgCov *_avg_posError = new AvgCov(3, "_posError", true, 1000, 1000, 1);
     AvgCov *_avg_angError = new AvgCov(3, "_angError", true, 1000, 1000, 1000);
+
+    int i;
+    double _yawCmdnew;
    
     //MPC 最后一次实现
     Eigen::DiagonalMatrix<double, 6> Q;
