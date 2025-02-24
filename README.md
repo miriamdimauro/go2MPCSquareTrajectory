@@ -27,7 +27,10 @@ This project is released under the same license as the original Unitree SDK and 
 - [unitreeMPC_guide by Mr-Y-B-L](https://github.com/Mr-Y-B-L/unitreeMPC_guide)
   
 ## Authors
-Cinardi Nicoletta, Di Mauro Miriam, Finocchiaro Carla, Panebianco Gaia.
+- Cinardi Nicoletta
+- Di Mauro Miriam
+- Finocchiaro Carla
+- Panebianco Gaia.
 
 For further information contact the project maintainers.
 
