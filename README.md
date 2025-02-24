@@ -1,43 +1,33 @@
-# Overview
-**The main contribution of this project is to add an MPC controller to the official unitree_guide project, making it easier for students learning model-based control of quadruped robots to get started.**(本项目主要贡献为在宇树官方项目unitree_guide中加入MPC控制器，便于入门四足机器人基于模型控制的同学学习。)
+# README
 
-**If my project is helpful for your learning, please light up a "Star" for me.**(如果我的项目对您的学习有所帮助，请为我点亮一颗“星星”。)
-# quick start
+## Overview
+This project is a fork of the original Unitree Go2 code combined with modifications based on the repository [unitreeMPC_guide](https://github.com/Mr-Y-B-L/unitreeMPC_guide/tree/master/src/unitreeMPC_guide/unitreeMPC_guide/src). The goal is to implement and refine a Model Predictive Control (MPC) algorithm for the Go2 robot, focusing on locomotion tasks such as trotting along a squared trajectory, both with and without rotation.
 
-## environment
+## Project Background
+The MPC implementation for the Go1 robot from the repository [unitreeMPC_guide](https://github.com/Mr-Y-B-L/unitreeMPC_guide/tree/master/src/unitreeMPC_guide/unitreeMPC_guide/src) was adapted for the Go2 robot. The original code has been modified to accommodate the specific requirements and configurations of the Go2 robot, maintaining the core functionality of the Model Predictive Control algorithm.
 
-1. Ubuntu 20.04
-2. ROS Neotic
+## Features
+- Square trajectory tracking without rotation
+- Square trajectory tracking with 90° rotations at each vertex
+- Velocity control proportional to positional error
+- Yaw control to maintain orientation toward the next vertex
 
-## build
-Please refer to Unitree official configuration for dependencies.
-1. [unitree_guide](https://github.com/unitreerobotics/unitree_guide)<br>
-2. [unitree_ros](https://github.com/unitreerobotics/unitree_ros)<br>
-3. [unitree_legged_msgs](https://github.com/unitreerobotics/unitree_ros_to_real)
+## Installation dependencies 
+- Ubuntu 20.04
+- ROS Neotic
 
-Clone this project
-```
-git clone git@github.com:Mr-Y-B-L/unitreeMPC_guide.git
-```
-Build
-```
-cd unitreeMPC_guide/
-```
-```
-catkin_make
-```
-Running
-```
-source ./devel/setup.bash
-```
-Start Gazebo
-```
-roslaunch unitreeMPC_guide gazeboSim.launch
-```
-Start MPC controller
-```
-./devel/lib/unitreeMPC_guide/junior_ctrl
-```
-# Acknowledgments
+## Build
+Please refer to Unitree official configuration [https://github.com/unitreerobotics/unitree_guide] and to the repository [unitreeMPC_guide](https://github.com/Mr-Y-B-L/unitreeMPC_guide) for detailed instructions on dependencies and configuration.
 
-[A1-QP-MPC-Controller](https://github.com/ShuoYangRobotics/A1-QP-MPC-Controller)
+## License
+This project is released under the same license as the original Unitree SDK and unitreeMPC_guide. Please refer to the respective licenses in the original repositories.
+
+## Acknowledgments
+- [Unitree Robotics](https://github.com/unitreerobotics/unitree_guide)
+- [unitreeMPC_guide by Mr-Y-B-L](https://github.com/Mr-Y-B-L/unitreeMPC_guide)
+  
+## Authors
+Cinardi Nicoletta, Di Mauro Miriam, Finocchiaro Carla, Panebianco Gaia.
+
+For further information contact the project maintainers.
+
