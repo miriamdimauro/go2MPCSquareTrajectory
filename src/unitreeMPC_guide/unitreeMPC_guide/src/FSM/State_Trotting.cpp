@@ -13,8 +13,8 @@ State_Trotting::State_Trotting(CtrlComponents *ctrlComp)
 
     _gaitHeight = 0.08;
     ctrl_states.reset();
-    
-    mpc_init_counter=0;
+    i=0;
+
 #ifdef ROBOT_TYPE_Go1
     _Kpp = Vec3(70, 70, 70).asDiagonal();
     _Kdp = Vec3(10, 10, 10).asDiagonal();
@@ -45,6 +45,7 @@ State_Trotting::~State_Trotting(){
 
 void State_Trotting::enter(){
     _pcd = _est->getPosition();
+    _p0 =  _est->getPosition();
     _pcd(2) = -_robModel->getFeetPosIdeal()(2, 0);
     _vCmdBody.setZero();
     _yawCmd = _lowState->getYaw();
@@ -123,6 +124,7 @@ void State_Trotting::run(){
 }
 
 bool State_Trotting::checkStepOrNot(){
+
     if( (fabs(_vCmdBody(0)) > 0.03) ||
         (fabs(_vCmdBody(1)) > 0.03) ||
         (fabs(_posError(0)) > 0.08) ||
@@ -153,47 +155,100 @@ void State_Trotting::getUserCmd(){
     _dYawCmd = -invNormalize(_userValue.rx, _wyawLim(0), _wyawLim(1));
     _dYawCmd = 0.9*_dYawCmdPast + (1-0.9) * _dYawCmd;
     _dYawCmdPast = _dYawCmd;
-    
 }
 
-void State_Trotting::calcCmd(){
-    /* Movement */
+void State_Trotting::calcCmd() {
+    // Define square vertices relative to starting position
+    static std::vector<Eigen::Vector3d> vertici = {
+        _p0,                                              // V1: Starting point
+        Eigen::Vector3d(_p0[0] + 5.0, _p0[1], 0.0),       // V2: Right
+        Eigen::Vector3d(_p0[0] + 5.0, _p0[1] + 5.0, 0.0), // V3: Top-right
+        Eigen::Vector3d(_p0[0], _p0[1] + 5.0, 0.0)        // V4: Top
+    };
+
+    // Define target orientations for each vertex (in radians)
+    static std::vector<double> target_yaws = {0, M_PI/2, M_PI, -M_PI/2}; // 0°, 90°, 180°, -90°
+    
+    // Calculate position and orientation errors
+    Eigen::Vector3d target = vertici[i];
+    Eigen::Vector3d error = target - _posBody;
+    double yaw_error = target_yaws[i] - _yaw;
+
+    // Normalize yaw error to [-π, π]
+    while (yaw_error > M_PI) yaw_error -= 2 * M_PI;
+    while (yaw_error < -M_PI) yaw_error += 2 * M_PI;
+
+    // Control parameters
+    const double SpeedFactor = 0.1;    // Linear velocity gain
+    const double RotFactor = 0.8;       // Angular velocity gain
+    const double yaw_threshold = 0.1;   // Threshold for orientation alignment
+    const double pos_threshold = 0.5;   // Threshold for position reaching
+
+    // Position and orientation control
+    if (error.norm() < pos_threshold) {
+        // When near target position, focus on rotation
+        _vCmdBody.setZero();  // Stop linear movement
+        _dYawCmd = RotFactor * yaw_error;
+        
+        // If rotation is complete, move to next vertex
+        if (std::abs(yaw_error) < yaw_threshold) {
+            i = (i + 1) % vertici.size();
+            _dYawCmd = 0;
+        }
+    } else {
+        // Calculate desired velocity in global frame
+        Eigen::Vector3d v_desired_global;
+        v_desired_global(0) = SpeedFactor * error(0);
+        v_desired_global(1) = SpeedFactor * error(1);
+        v_desired_global(2) = 0;
+
+        // Transform desired velocity to robot frame
+        _vCmdBody = _G2B_RotMat * v_desired_global;
+        _dYawCmd = 0;
+    }
+
+    // Transform body velocity to global frame
     _vCmdGlobal = _B2G_RotMat * _vCmdBody;
 
-    _vCmdGlobal(0) = saturation(_vCmdGlobal(0), Vec2(_velBody(0)-0.2, _velBody(0)+0.2));
-    _vCmdGlobal(1) = saturation(_vCmdGlobal(1), Vec2(_velBody(1)-0.2, _velBody(1)+0.2));
+    // Apply velocity and angular velocity saturation
+    _vCmdGlobal(0) = saturation(_vCmdGlobal(0), Vec2(_velBody(0) - 0.2, _velBody(0) + 0.2));
+    _vCmdGlobal(1) = saturation(_vCmdGlobal(1), Vec2(_velBody(1) - 0.2, _velBody(1) + 0.2));
+    _dYawCmd = saturation(_dYawCmd, Vec2(-0.5, 0.5));
 
-    _pcd(0) = saturation(_pcd(0) + _vCmdGlobal(0) * _ctrlComp->dt, Vec2(_posBody(0) - 0.05, _posBody(0) + 0.05));
-    _pcd(1) = saturation(_pcd(1) + _vCmdGlobal(1) * _ctrlComp->dt, Vec2(_posBody(1) - 0.05, _posBody(1) + 0.05));
+    // Update position command
+    _pcd(0) = saturation(_pcd(0) + _vCmdGlobal(0) * _ctrlComp->dt, 
+                        Vec2(_posBody(0) - 0.05, _posBody(0) + 0.05));
+    _pcd(1) = saturation(_pcd(1) + _vCmdGlobal(1) * _ctrlComp->dt, 
+                        Vec2(_posBody(1) - 0.05, _posBody(1) + 0.05));
 
-    _vCmdGlobal(2) = 0;
-
-    /* Turning */
-    
-    _yawCmd = _yawCmd + _dYawCmd * _ctrlComp->dt;
-    
-    
+    // Update rotation and orientation
     _Rd = rotz(_yawCmd);
     _wCmdGlobal(2) = _dYawCmd;
+    _yawCmd = _yaw+ _dYawCmd * _ctrlComp->dt;
+    _B2G_RotMat = _Rd;
 
-    ctrl_states.root_euler=_rpy;
+    // Debug output
+    std::cout << "Position: " << _posBody.transpose() << std::endl;
+    std::cout << "Target: " << target.transpose() << std::endl;
+    std::cout << "Current Yaw: " << _yaw << std::endl;
+    std::cout << "Target Yaw: " << target_yaws[i] << std::endl;
+    std::cout << "Error: " << error.transpose() << std::endl;
+    std::cout << "Commanded Body Velocity: " << _vCmdBody.transpose() << std::endl;
+    std::cout << "vertici: " << vertici[i] << std::endl;
 
-    ctrl_states.root_pos=_posBody;
-
-    ctrl_states.root_ang_vel=_rpyd;
-
-    // std::cout<<"rpy"<<_rpy<<std::endl;
-
-    ctrl_states.root_lin_vel=_velBody;//
-    ctrl_states.root_rot_mat=_B2G_RotMat;
-    ctrl_states.root_lin_vel_d=_vCmdBody;
-    ctrl_states.root_ang_vel_d[2]=_dYawCmd;
-    ctrl_states.foot_pos_abs=_posFeet2BGlobal;
-    ctrl_states.contacts=*_contact;
-    //ctrl_states.root_pos_d[2]=_pcd(2);
-    ctrl_states.root_pos_d[2]=_pcd(2);
-    // std::cout<<"pcd"<<_pcd(2)<<std::endl;
+    // Update control states
+    ctrl_states.root_euler = _rpy;
+    ctrl_states.root_pos = _posBody;
+    ctrl_states.root_ang_vel = _rpyd;
+    ctrl_states.root_lin_vel = _velBody;
+    ctrl_states.root_rot_mat = _B2G_RotMat;
+    ctrl_states.root_lin_vel_d = _vCmdBody;
+    ctrl_states.root_ang_vel_d[2] = _dYawCmd;
+    ctrl_states.foot_pos_abs = _posFeet2BGlobal;
+    ctrl_states.contacts = *_contact;
+    ctrl_states.root_pos_d[2] = _pcd(2);
 }
+
 
 void State_Trotting::calcTau(){
 
@@ -224,6 +279,9 @@ void State_Trotting::calcTau(){
     _q = vec34ToVec12(_lowState->getQ());
     _tau = _robModel->getTau(_q, _forceFeetBody);
 }
+    
+
+
 
 void State_Trotting::calcQQd(){
 
@@ -254,36 +312,30 @@ Eigen::Matrix<double, 3, NUM_LEG> State_Trotting::compute_grf(CtrlStates &state,
             state.root_lin_vel[0], state.root_lin_vel[1], state.root_lin_vel[2],
             -9.8;
 
-        
     double mpc_dt = dt;
-    // initialize the desired mpc states trajectory
-
     state.root_lin_vel_d_world = state.root_rot_mat * state.root_lin_vel_d;
     state.root_ang_vel_d_world=state.root_rot_mat *state.root_ang_vel_d;
+    int n_steps = 10; 
 
-        //state.root_ang_vel_d = state.root_rot_mat * state.root_ang_vel_d;
+    for (int i = 0; i < PLAN_HORIZON; i++) {
+    
+        state.mpc_states_d.segment(i * 13, 13) << 
+            state.root_euler_d[0], 
+            state.root_euler_d[1], 
+            state.root_euler[2] + state.root_ang_vel_d_world[2] * mpc_dt * (i + 1), 
+            state.root_pos[0] + state.root_lin_vel_d_world[0] * mpc_dt * (i + 1), 
+            state.root_pos[1] + state.root_lin_vel_d_world[1] * mpc_dt * (i + 1), 
+            state.root_pos_d[2], 
+            state.root_ang_vel_d_world[0], 
+            state.root_ang_vel_d_world[1], 
+            state.root_ang_vel_d_world[2], 
+            state.root_lin_vel_d_world[0], 
+            state.root_lin_vel_d_world[1], 
+            0, 
+            -9.8;
 
-        // state.mpc_states_d.resize(13 * PLAN_HORIZON);
-    for (int i = 0; i < PLAN_HORIZON; ++i) {
-        state.mpc_states_d.segment(i * 13, 13)
-                <<
-                state.root_euler_d[0],
-                state.root_euler_d[1],
-                // 0,
-                // 0,
-                //state.root_euler[2] + state.root_ang_vel_d_world[2] * mpc_dt * (i + 1),
-                state.root_euler[2] + state.root_ang_vel_d_world[2] * mpc_dt * (i + 1),
-                state.root_pos[0] + state.root_lin_vel_d_world[0] * mpc_dt * (i + 1),
-                state.root_pos[1] + state.root_lin_vel_d_world[1] * mpc_dt * (i + 1),
-                state.root_pos_d[2],
-                state.root_ang_vel_d_world[0],
-                state.root_ang_vel_d_world[1],
-                state.root_ang_vel_d_world[2],
-                state.root_lin_vel_d_world[0],
-                state.root_lin_vel_d_world[1],
-                0,
-                -9.8;
-    }
+        }
+    
 
         // a single A_c is computed for the entire reference trajectory
         auto t1 = std::chrono::high_resolution_clock::now();
